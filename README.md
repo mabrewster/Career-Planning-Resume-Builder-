@@ -135,34 +135,7 @@ Drag and Drop Resume Builder! Directions: Press on the skill cards on the left a
       });
     }
 
-    // PDF Download
-    function downloadPDF() {
-      const element = document.getElementById('exportArea');
-
-      // Defensive: verify library loaded
-      if (typeof html2pdf === 'undefined') {
-        alert('PDF generator is not available. Please check your network and try again.');
-        console.error('[PDF] html2pdf.js not loaded. Check the CDN/script tag.');
-        return;
-      }
-
-      // Sensible defaults
-      const opt = {
-        margin:       [10, 10, 10, 10],
-        filename:     'resume.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  {
-          scale: Math.min(2, window.devicePixelRatio || 1.5),
-          backgroundColor: '#ffffff',
-          useCORS: true,
-          allowTaint: false
-        },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: ['css', 'legacy'] }
-      };
-
-      html2pdf().from(element).set(opt).save();
-    }
-  </script>
-</body>
-</html>
+    const imgHeightMm = imgHeightPx / pxPerMm;
+const pageUsableHeightMm = pageHeight - margin * 2;
+const drawHeightMm = Math.min(imgHeightMm, pageUsableHeightMm);
+pdf.addImage(imgData, 'JPEG', margin, margin, usableWidth, drawHeightMm);
