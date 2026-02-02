@@ -276,98 +276,103 @@ Drag and Drop Resume Builder! Directions: Press on the skill cards on the left a
         }
       });
     }
+<script>
+  async function downloadPDF() {
+    const exportEl = document.getElementById('exportArea');
 
-    /**
-     * Create a full snapshot of the resume, with automatic multi-page support.
-     * This uses html2canvas to render the element as an image and then slices it
-     * into A4 pages in jsPDF so nothing gets truncated.
-     */
-    async function downloadPDF() {
-      const exportEl = document.getElementById('exportArea');
-
-      // Verify libraries are present
-      const hasH2C = typeof window.html2canvas !== 'undefined';
-      const hasJsPDF = window.jspdf && window.jspdf.jsPDF;
-      if (!hasH2C || !hasJsPDF) {
-        alert('PDF generator is not available. Please reload or try a different network.');
-        console.error('Missing libs:', { html2canvas: hasH2C, jsPDF: !!hasJsPDF });
-        return;
-      }
-
-      // Add a temporary "for-pdf" class to simplify visuals for the snapshot
-      exportEl.classList.add('for-pdf');
-
-      try {
-        // Render the element to canvas at a good quality
-        const scale = Math.min(2, window.devicePixelRatio || 1.5);
-        const canvas = await window.html2canvas(exportEl, {
-          scale,
-          backgroundColor: '#ffffff',
-          useCORS: true,
-          allowTaint: false,
-          logging: false
-        });
-
-        const imgData = canvas.toDataURL('image/jpeg', 0.98);
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-
-        const pageWidth = pdf.internal.pageSize.getWidth();   // 210mm
-        const pageHeight = pdf.internal.pageSize.getHeight(); // 297mm
-        const margin = 10; // mm
-        const usableWidth = pageWidth - margin * 2; // content width in mm
-
-        // Relate canvas pixels to PDF mm based on width mapping:
-        // - We scale the snapshot to fit PDF usable width.
-        const imgWidthPx = canvas.width;
-        const imgHeightPx = canvas.height;
-        const pxPerMm = imgWidthPx / usableWidth; // pixels per mm (based on width fitting)
-        const pageUsableHeightMm = pageHeight - margin * 2;
-        const pageUsableHeightPx = Math.floor(pageUsableHeightMm * pxPerMm);
-
-        // If it fits on one page, just add it; otherwise slice it across pages
-        if (imgHeightPx <= pageUsableHeightPx) {
-          const imgHeightMm = imgHeightPx / pxPerMm;
-          pdf.addImage(imgData, 'JPEG', margin, margin, usableWidth, imgHeightMm);
-        } else {
-          let sY = 0;
-          let pageIndex = 0;
-
-          while (sY < imgHeightPx) {
-            const sliceHeightPx = Math.min(pageUsableHeightPx, imgHeightPx - sY);
-
-            // Create a canvas for this page slice
-            const pageCanvas = document.createElement('canvas');
-            pageCanvas.width = imgWidthPx;
-            pageCanvas.height = sliceHeightPx;
-
-            const ctx = pageCanvas.getContext('2d');
-            // Draw the current slice from the big canvas
-            ctx.drawImage(
-              canvas,
-              0, sY, imgWidthPx, sliceHeightPx,  // source rect
-              0, 0, imgWidthPx, sliceHeightPx    // destination rect
-            );
-
-            const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.98);
-            const sliceHeightMm = sliceHeightPx / pxPerMm;
-
-            if (pageIndex > 0) pdf.addPage();
-            pdf.addImage(pageImgData, 'JPEG', margin, margin, usableWidth, sliceHeightMm);
-
-            sY += sliceHeightPx;
-            pageIndex++;
-          }
-        }
-
-        pdf.save('resume.pdf');
-      } catch (err) {
-        console.error('PDF generation failed:', err);
-        alert('Sorry, the PDF could not be generated. Try reloading the page or a different browser.');
-      } finally {
-        exportEl.classList.remove('for-pdf');
-      }
+    // Verify libraries from the html2pdf bundle
+    const hasH2C = typeof window.html2canvas !== 'undefined';
+    const hasJsPDF = window.jspdf && window.jspdf.jsPDF;
+    if (!hasH2C || !hasJsPDF) {
+      alert('PDF generator is not available. Please reload and try again.');
+      console.error('Missing libs:', { html2canvas: hasH2C, jsPDF: !!hasJsPDF });
+      return;
     }
-  </script>
-</body>
-</html>
+
+    // Wait for images (if any) to finish loading inside the resume
+    const waitForImages = (root) => {
+      const imgs = Array.from(root.querySelectorAll('img'));
+      if (imgs.length === 0) return Promise.resolve();
+      return Promise.all(
+        imgs.map(img => img.complete ? Promise.resolve() :
+          new Promise(res => { img.onload = img.onerror = res; })
+        )
+      );
+    };
+
+    exportEl.classList.add('for-pdf');
+    await waitForImages(exportEl);
+    // Let the browser paint any last DOM updates before capture
+    await new Promise(requestAnimationFrame);
+
+    try {
+      const scale = Math.min(2, window.devicePixelRatio || 1.5);
+      const canvas = await window.html2canvas(exportEl, {
+        scale,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        allowTaint: false,
+        logging: false
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+
+      const pageWidth = pdf.internal.pageSize.getWidth();   // ~210mm
+      const pageHeight = pdf.internal.pageSize.getHeight(); // ~297mm
+      const margin = 10;                                    // mm margins
+      const usableWidth = pageWidth - margin * 2;
+
+      // Canvas sizes in px
+      const imgWidthPx = canvas.width;
+      const imgHeightPx = canvas.height;
+
+      // Pixels per mm (fit to width)
+      const pxPerMm = imgWidthPx / usableWidth;
+
+      // Usable page height in px (convert mm → px)
+      const pageUsableHeightPx = Math.floor((pageHeight - margin * 2) * pxPerMm);
+
+      // 🔁 Slice big canvas into pages
+      let sY = 0;
+      let pageIndex = 0;
+
+      while (sY < imgHeightPx) {
+        const sliceHeightPx = Math.min(pageUsableHeightPx, imgHeightPx - sY);
+
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = imgWidthPx;
+        pageCanvas.height = sliceHeightPx;
+
+        const ctx = pageCanvas.getContext('2d');
+        // Improve slice quality
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        // Draw slice from main canvas → page canvas
+        ctx.drawImage(
+          canvas,
+          0, sY, imgWidthPx, sliceHeightPx, // source rect
+          0, 0, imgWidthPx, sliceHeightPx   // dest rect
+        );
+
+        const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.98);
+        const sliceHeightMm = sliceHeightPx / pxPerMm;
+
+        if (pageIndex > 0) pdf.addPage();
+        pdf.addImage(pageImgData, 'JPEG', margin, margin, usableWidth, sliceHeightMm);
+
+        sY += sliceHeightPx;
+        pageIndex++;
+      }
+
+      pdf.save('resume.pdf');
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      alert('Sorry, the PDF could not be generated. Try reloading the page or another browser.');
+    } finally {
+      exportEl.classList.remove('for-pdf');
+    }
+  }
+</script>
