@@ -276,6 +276,17 @@ Drag and Drop Resume Builder! Directions: Press on the skill cards on the left a
         }
       });
     }
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" defer></script>
+``
+<style>
+  /* Ensures the right column can grow and be fully captured */
+  #exportArea { overflow: visible; }
+
+  /* Optional: remove heavy effects only during capture */
+  #exportArea.for-pdf, #exportArea.for-pdf * {
+    box-shadow: none !important;
+  }
+</style>
 <script>
   async function downloadPDF() {
     const exportEl = document.getElementById('exportArea');
